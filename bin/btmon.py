@@ -2330,11 +2330,14 @@ class BufferedDataCollector(object):
                 self.open()
                 self._read(packet_format)
                 havedata = True
+            except EmptyReadError, e:
+                dbgmsg('read failed, socket closed by other side: %s' % e.msg)
+                raise e
             except ReadError, e:
                 dbgmsg('read failed: %s' % e.msg)
             except KeyboardInterrupt, e:
                 raise e
-            except (EmptyReadError, Exception), e:
+            except Exception, e:
                 nerr += 1
                 dbgmsg('failed read %d of %d' % (nerr, READ_RETRIES))
                 errmsg(e)
@@ -2565,6 +2568,8 @@ class SocketServerCollector(BufferedDataCollector):
             dbgmsg('SOCKET: waiting for connection')
             self._conn, addr = self._sock.accept()
             self._blockingread(packet_format)
+        except EmptyReadError, e:
+            dbgmsg('SOCKET: connection closed by other side')
         finally:
             if self._conn:
                 dbgmsg('SOCKET: closing connection')
