@@ -8,7 +8,7 @@ Copyright: Matthew Wall, all rights reserved
 License: GPLv3
 
 Pre-Requisites:
-- Python 2.6 or 2.7 (Python 3 is not supported)
+- Python 2.6 or 2.7 (Python 3 support is partial for btmon3.py thanks to BenK22)
 - python-serial (required for serial connections)
 - python-mysqldb (required if saving to mysql database)
 - python-sqlite3 (required if saving to sqlite database)
@@ -17,7 +17,7 @@ Pre-Requisites:
 
 <h2>brultech power monitors</h2>
 
-btmon.py - read data from ecm-1220, ecm-1240, or green-eye device
+btmon.py and bymon3.py - read data from ecm-1220, ecm-1240, or green-eye device
 
 btcfg.py - configure the green-eye monitor
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = '4.0.1'
+__version__ = '4.1.0'
 """Data collector/processor for Brultech monitoring devices. Python 3 conversion.
 
 Collect data from Brultech ECM-1240, ECM-1220, and GEM power monitors.  Print
@@ -219,28 +219,22 @@ computer reading/writing to a very slow usb drive, a single update takes about
 
 InfluxDB Configuration:
 
-Connections to InfluxDB require the InfluxDB-Python client. On Debian/Ubuntu,
-you can install it with
+Connections to InfluxDB require the InfluxDB-Python client. You can run
 
-  apt-get install python-influxdb
-
-Otherwise, you can run
-
-  pip install influxdb
+  pip install influxdb-client
 
 This uses the InfluxDB HTTP API, which by default runs on port 8086. You must
 specify the database and measurement to write to.
 
 [influxdb]
 influxdb_out = true
-influxdb_host = localhost           # default
-influxdb_port = 8086                # default
-influxdb_upload_period = 60         # default
-influxdb_username = btmon           # if using authentication
-influxdb_password = abcde           # if using authentication
-influxdb_database = btmon           # required
-influxdb_measurement = energy       # required
-influxdb_mode = row                 # "row": 1 series w/ many values; "col": many series w/ 1 value each
+influxdb_url = http://localhost:8086 # default
+influxdb_upload_period = 60          # default
+influxdb_token = abcde               # required
+influxdb_org = abcde                 # required
+influxdb_bucket = btmon              # required
+influxdb_measurement = energy        # required
+influxdb_mode = row                  # "row": 1 series w/ many values; "col": many series w/ 1 value each
 influxdb_map = 1234567_ch1_aws,a,1234567_ch2_aws,b  # renames channels
 influxdb_tags = key1,value1,key2,value2             # adds tags
 influxdb_db_schema = counters,ecmread,ecmreadext       # selects schema, default counters
@@ -1240,13 +1234,12 @@ MQTT_UPLOAD_PERIOD     = MINUTE
 # InfluxDB defaults
 #   Minimum upload interval is 60 seconds.
 #   Recommended sampling interval is 2 to 30 seconds.
-INFLUXDB_HOST = 'localhost'
-INFLUXDB_PORT = '8086'
+INFLUXDB_URL = 'http://localhost:8086'
 INFLUXDB_UPLOAD_PERIOD = 1 * MINUTE
 INFLUXDB_TIMEOUT = 60 # seconds
-INFLUXDB_USERNAME = ''
-INFLUXDB_PASSWORD = ''
-INFLUXDB_DATABASE = ''
+INFLUXDB_TOKEN = ''
+INFLUXDB_ORG = ''
+INFLUXDB_BUCKET = ''
 INFLUXDB_MEASUREMENT = ''
 INFLUXDB_MODE = 'col'
 INFLUXDB_MAP = ''
@@ -1313,7 +1306,8 @@ except ImportError:
     publish = None
 
 try:
-    from influxdb import InfluxDBClient
+    from influxdb_client import InfluxDBClient
+    from influxdb_client.client.write_api import SYNCHRONOUS
 except ImportError:
     InfluxDBClient = None
 
@@ -4234,13 +4228,12 @@ class MQTTProcessor(BaseProcessor):
 
 
 class InfluxDBProcessor(UploadProcessor):
-    def __init__(self, host, port, username, password, database, mode, measurement, map_str, tag_str, period, timeout, db_schema):
+    def __init__(self, url, org, token, bucket, mode, measurement, map_str, tag_str, period, timeout, db_schema):
         super(InfluxDBProcessor, self).__init__()
-        self.host = host
-        self.port = port
-        self.username = username
-        self.password = password
-        self.database = database
+        self.url = url
+        self.org = org
+        self.token = token
+        self.bucket = bucket
         self.mode = mode
         self.measurement = measurement
         self.map_str = map_str
@@ -4265,11 +4258,10 @@ class InfluxDBProcessor(UploadProcessor):
                 print(('  %s' % fmt))
             sys.exit(1)
 		
-
         infmsg('InfluxDB: upload period: %d' % self.process_period)
-        infmsg('InfluxDB: host: %s' % self.host)
-        infmsg('InfluxDB: port: %s' % self.port)
-        infmsg('InfluxDB: username: %s' % self.username)
+        infmsg('InfluxDB: url: %s' % self.url)
+        infmsg('InfluxDB: org: %s' % self.org)
+        infmsg('InfluxDB: bucket: %s' % self.bucket)
         infmsg('InfluxDB: map: %s' % self.map_str)
         infmsg('InfluxDB: schema: %s' % self.db_schema)
 
@@ -4304,12 +4296,9 @@ class InfluxDBProcessor(UploadProcessor):
                     values['fields'] = {}
                     values['fields'][value_name] = p[c] * 1.0
                 series.append(values)
-        client = InfluxDBClient(self.host, self.port, self.username, self.password, self.database)
-        try:
-                client.create_database(self.database)
-        except:
-                pass
-        client.write_points(series, tags=self.tags)
+        client = InfluxDBClient(url = self.url, token = self.token, org = self.org)
+        write_api = client.write_api(write_options=SYNCHRONOUS)
+        write_api.write(bucket=self.bucket, record=series)
 
 def ord(s):
     if isinstance(s, (bytes, bytearray)):
@@ -4540,11 +4529,10 @@ if __name__ == '__main__':
 
     group = optparse.OptionGroup(parser, 'InfluxDB options')
     group.add_option('--influxdb', action='store_true', dest='influxdb_out', default=False, help='upload data to InfluxBD')
-    group.add_option('--influxdb-username', help='username', metavar='USERNAME')
-    group.add_option('--influxdb-password', help='password', metavar='PASSWORD')
-    group.add_option('--influxdb-host', help='HOST', metavar='HOST')
-    group.add_option('--influxdb-port', help='PORT', metavar='PORT')
-    group.add_option('--influxdb-database', help='DATABASE', metavar='DATABASE')
+    group.add_option('--influxdb-token', help='token', metavar='TOKEN')
+    group.add_option('--influxdb-org', help='org', metavar='ORG')
+    group.add_option('--influxdb-url', help='url', metavar='URL')
+    group.add_option('--influxdb-bucket', help='bucket', metavar='BUCKET')
     group.add_option('--influxdb-mode', choices=['row', 'col'], help='row (1 series w/ many values) or col (many series w/ 1 value each)', metavar='MODE')
     group.add_option('--influxdb-measurement', help='MEASUREMENT', metavar='MEASUREMENT')
     group.add_option('--influxdb-map', help='channel-to-device mapping', metavar='MAP')
@@ -4903,11 +4891,10 @@ if __name__ == '__main__':
             print ('InfluxDBClient not loaded, cannot write to InfluxDB')
             sys.exit(1)
         procs.append(InfluxDBProcessor
-                     (options.influxdb_host or INFLUXDB_HOST,
-                      options.influxdb_port or INFLUXDB_PORT,
-                      options.influxdb_username or INFLUXDB_USERNAME,
-                      options.influxdb_password or INFLUXDB_PASSWORD,
-                      options.influxdb_database or INFLUXDB_DATABASE,
+                     (options.influxdb_url or INFLUXDB_URL,
+                      options.influxdb_org or INFLUXDB_ORG,
+                      options.influxdb_token or INFLUXDB_TOKEN,
+                      options.influxdb_bucket or INFLUXDB_BUCKET,
                       options.influxdb_mode or INFLUXDB_MODE,
                       options.influxdb_measurement or INFLUXDB_MEASUREMENT,
                       options.influxdb_map or INFLUXDB_MAP,
