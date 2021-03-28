@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-__version__ = '4.0.0'
+#!/usr/bin/env python3
+__version__ = '4.0.1'
 """Data collector/processor for Brultech monitoring devices. Python 3 conversion.
 
 Collect data from Brultech ECM-1240, ECM-1220, and GEM power monitors.  Print
@@ -2333,11 +2333,14 @@ class BufferedDataCollector(object):
                 self.open()
                 self._read(packet_format)
                 havedata = True
+            except EmptyReadError as e:
+                dbgmsg('read failed, socket closed by other side: %s' % e.msg)
+                raise e
             except ReadError as e:
                 dbgmsg('read failed: %s' % e.msg)
             except KeyboardInterrupt as e:
                 raise e
-            except (EmptyReadError, Exception) as e:
+            except Exception as e:
                 nerr += 1
                 dbgmsg('failed read %d of %d' % (nerr, READ_RETRIES))
                 errmsg(e)
@@ -2568,10 +2571,13 @@ class SocketServerCollector(BufferedDataCollector):
             dbgmsg('SOCKET: waiting for connection')
             self._conn, addr = self._sock.accept()
             self._blockingread(packet_format)
+        except EmptyReadError:
+            dbgmsg('SOCKET: connection closed by other side')
         finally:
             if self._conn:
                 dbgmsg('SOCKET: closing connection')
-                self._conn.shutdown(socket.SHUT_RD)
+                # this causes the close() to fail, not sure why
+                #self._conn.shutdown(socket.SHUT_RD)
                 self._conn.close()
                 self._conn = None
 
