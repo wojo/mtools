@@ -2573,7 +2573,11 @@ class SocketServerCollector(BufferedDataCollector):
         finally:
             if self._conn:
                 dbgmsg('SOCKET: closing connection')
-                self._conn.shutdown(socket.SHUT_RD)
+                try:
+                    self._conn.shutdown(socket.SHUT_RD)
+                except:
+                    # ignore errors like the connection is already closed
+                    pass
                 self._conn.close()
                 self._conn = None
 
