@@ -4274,8 +4274,6 @@ class InfluxDBProcessor(UploadProcessor):
         self.tags = pairs2dict(self.tag_str)
 
     def process_calculated(self, packets):
-        sensors = dict()
-        readings = dict()
         series = []
         for p in packets:
             dev_serial = obfuscate_serial(p['serial'])
