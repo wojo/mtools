@@ -1247,7 +1247,6 @@ INFLUXDB_TAG_MAP = ''
 INFLUXDB_DB_SCHEMA = FILTER_DB_SCHEMA_COUNTERS
 
 import base64
-import bisect
 import calendar
 import errno
 import optparse
@@ -2747,14 +2746,19 @@ class MovingBuffer(object):
         self.packets = []
 
     def insert(self, timestamp, packet):
-        dbgmsg('buffering packet ts:%d sn:%s' % (timestamp, packet['serial']))
-        bisect.insort(self.packets, (timestamp, packet))
+        idx = next((index for (index, t) in enumerate(self.packets) if t[0] > timestamp), None)
+        if idx is None:
+            dbgmsg('buffering packet ts:%d sn:%s' % (timestamp, packet['serial']))
+            self.packets.append((timestamp, packet))
+        else:
+            dbgmsg('buffering out-of-order packet ts:%d sn:%s, len=%d, idx=%d' % (timestamp, packet['serial'], len(self.packets), idx))
+            self.packets.insert(idx, (timestamp, packet))
         if len(self.packets) > self.maxsize:
             del(self.packets[0])
 
     def newest(self, timestamp):
         """return all packets with timestamp newer than specified timestamp"""
-        idx = bisect.bisect(self.packets, (timestamp, ))
+        idx = next((index for (index, t) in enumerate(self.packets) if t[0] >= timestamp), 0)
         return self.packets[idx:]
 
     def oldest(self):
