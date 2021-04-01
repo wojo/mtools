@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = '4.1.2'
+__version__ = '4.1.3'
 """Data collector/processor for Brultech monitoring devices. Python 3 conversion.
 
 Collect data from Brultech ECM-1240, ECM-1220, and GEM power monitors.  Print
@@ -4303,6 +4303,8 @@ class InfluxDBProcessor(UploadProcessor):
         client = InfluxDBClient(url = self.url, token = self.token, org = self.org)
         write_api = client.write_api(write_options=SYNCHRONOUS)
         write_api.write(bucket=self.bucket, record=series)
+        write_api.close()
+        client.close()
 
 def ord(s):
     if isinstance(s, (bytes, bytearray)):
